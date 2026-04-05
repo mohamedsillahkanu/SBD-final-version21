@@ -724,96 +724,77 @@ window.openSummaryModal = function() {
     const pending   = all.filter(s => !isSchoolSubmitted(s.key));
     const pct = total > 0 ? Math.round((submitted.length / total) * 100) : 0;
 
+    // Build district summary ONLY from actual submissions — no CSV data
     const byDist = {};
-    all.forEach(s => {
-        const rec = getSubmittedRecord(s.key);
+    submitted.forEach(s => {
         const dist = s.district || 'Unknown';
-        if (!byDist[dist]) byDist[dist] = { total:0, submitted:0 };
-        byDist[dist].total++;
-        if (isSchoolSubmitted(s.key)) byDist[dist].submitted++;
+        if (!byDist[dist]) byDist[dist] = { submitted:0 };
+        byDist[dist].submitted++;
     });
 
     let distRows = '';
-    Object.entries(byDist).sort().forEach(([d, v]) => {
-        const dpct = Math.round((v.submitted / v.total) * 100);
-        distRows += `<tr>
-          <td style="font-weight:600;text-align:left;">${d}</td>
-          <td style="text-align:center;">${v.total}</td>
-          <td style="text-align:center;color:#28a745;font-weight:700;">${v.submitted}</td>
-          <td style="text-align:center;color:#dc3545;font-weight:700;">${v.total-v.submitted}</td>
-          <td style="text-align:center;">
-            <div style="background:#e9ecef;border-radius:4px;height:10px;width:100px;overflow:hidden;margin:0 auto;">
-              <div style="background:${dpct===100?'#28a745':'#004080'};height:100%;width:${dpct}%;transition:width .3s;"></div>
-            </div>
-            <span style="font-size:10px;font-weight:700;color:${dpct===100?'#28a745':'#004080'};">${dpct}%</span>
-          </td>
-        </tr>`;
-    });
+    if (Object.keys(byDist).length === 0) {
+        distRows = `<tr><td colspan="2" style="padding:20px;text-align:center;color:#aaa;font-style:italic;">No submissions yet</td></tr>`;
+    } else {
+        Object.entries(byDist).sort().forEach(([d, v]) => {
+            distRows += `<tr>
+              <td style="font-weight:600;text-align:left;padding:10px 15px;">${d}</td>
+              <td style="text-align:center;padding:10px;color:#28a745;font-weight:700;font-size:15px;">${v.submitted}</td>
+            </tr>`;
+        });
+    }
 
+    // School list — ONLY submitted schools, nothing from CSV
     let schoolRows = '';
-    all.sort((a,b)=>a.district.localeCompare(b.district)||a.chiefdom.localeCompare(b.chiefdom)||a.school_name.localeCompare(b.school_name))
-       .forEach(s => {
-           const done = isSchoolSubmitted(s.key);
-           const rec  = getSubmittedRecord(s.key);
-           const when = rec ? formatDate(rec.timestamp) : '—';
-           const coverage = rec?.data?.coverage_total ? rec.data.coverage_total+'%' : '—';
-           schoolRows += `
-             <tr style="cursor:pointer;${done?'background:#f0fff0;':''}" onclick="openSchoolDetail('${s.key}')">
-               <td style="padding:10px 8px;text-align:left;">
-                 <span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${done?'#28a745':'#ffc107'};margin-right:8px;flex-shrink:0;"></span>
-                 <strong>${s.school_name}</strong>
-               </td>
-               <td style="padding:10px 8px;text-align:center;font-size:12px;">${s.district}</td>
-               <td style="padding:10px 8px;text-align:center;font-size:12px;">${s.chiefdom||'—'}</td>
-               <td style="padding:10px 8px;text-align:center;font-size:12px;">${s.facility||'—'}</td>
-               <td style="padding:10px 8px;text-align:center;font-size:12px;">${s.community||'—'}</td>
-               <td style="padding:10px 8px;text-align:center;">
-                 ${done
-                   ? '<span style="background:#28a745;color:#fff;border-radius:4px;padding:3px 10px;font-size:11px;font-weight:600;letter-spacing:0.5px;">SUBMITTED</span>'
-                   : '<span style="background:#ffc107;color:#000;border-radius:4px;padding:3px 10px;font-size:11px;font-weight:600;letter-spacing:0.5px;">PENDING</span>'}
-               </td>
-               <td style="padding:10px 8px;text-align:center;font-size:11px;color:#666;">${when}</td>
-               <td style="padding:10px 8px;text-align:center;font-weight:700;color:${done?'#28a745':'#aaa'}">${coverage}</td>
-               <td style="padding:10px 8px;text-align:center;">
-                 ${done
-                   ? `<button onclick="event.stopPropagation();openSchoolDetail('${s.key}')" style="background:#004080;color:#fff;border:none;border-radius:4px;padding:5px 13px;font-size:11px;font-weight:600;cursor:pointer;font-family:'Oswald',sans-serif;letter-spacing:0.5px;">VIEW</button>`
-                   : `<button onclick="event.stopPropagation();loadSchoolIntoForm('${s.key}')" style="background:#28a745;color:#fff;border:none;border-radius:4px;padding:5px 13px;font-size:11px;font-weight:600;cursor:pointer;font-family:'Oswald',sans-serif;letter-spacing:0.5px;">START</button>`}
-               </td>
-             </tr>`;
-       });
+    if (submitted.length === 0) {
+        schoolRows = `<tr><td colspan="9" style="padding:32px;text-align:center;color:#aaa;font-style:italic;">No submissions yet — schools will appear here once data is submitted.</td></tr>`;
+    } else {
+        submitted
+          .sort((a,b)=>a.district.localeCompare(b.district)||a.chiefdom.localeCompare(b.chiefdom)||a.school_name.localeCompare(b.school_name))
+          .forEach(s => {
+              const rec      = getSubmittedRecord(s.key);
+              const when     = rec ? formatDate(rec.timestamp) : '—';
+              const coverage = rec?.data?.coverage_total ? rec.data.coverage_total+'%' : '—';
+              schoolRows += `
+                <tr style="cursor:pointer;background:#f0fff0;" onclick="openSchoolDetail('${s.key}')">
+                  <td style="padding:10px 8px;text-align:left;">
+                    <span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#28a745;margin-right:8px;flex-shrink:0;"></span>
+                    <strong>${s.school_name}</strong>
+                  </td>
+                  <td style="padding:10px 8px;text-align:center;font-size:12px;">${s.district}</td>
+                  <td style="padding:10px 8px;text-align:center;font-size:12px;">${s.chiefdom||'—'}</td>
+                  <td style="padding:10px 8px;text-align:center;font-size:12px;">${s.facility||'—'}</td>
+                  <td style="padding:10px 8px;text-align:center;font-size:12px;">${s.community||'—'}</td>
+                  <td style="padding:10px 8px;text-align:center;">
+                    <span style="background:#28a745;color:#fff;border-radius:4px;padding:3px 10px;font-size:11px;font-weight:600;letter-spacing:0.5px;">SUBMITTED</span>
+                  </td>
+                  <td style="padding:10px 8px;text-align:center;font-size:11px;color:#666;">${when}</td>
+                  <td style="padding:10px 8px;text-align:center;font-weight:700;color:#28a745">${coverage}</td>
+                  <td style="padding:10px 8px;text-align:center;">
+                    <button onclick="event.stopPropagation();openSchoolDetail('${s.key}')" style="background:#004080;color:#fff;border:none;border-radius:4px;padding:5px 13px;font-size:11px;font-weight:600;cursor:pointer;font-family:'Oswald',sans-serif;letter-spacing:0.5px;">VIEW</button>
+                  </td>
+                </tr>`;
+          });
+    }
 
     body.innerHTML = `
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:15px;margin-bottom:25px;">
-        <div style="background:#e8f1fa;border:2px solid #004080;border-radius:10px;padding:20px 10px;text-align:center;">
-          <div style="font-size:36px;font-weight:700;color:#004080;">${total}</div>
-          <div style="font-size:12px;color:#555;text-transform:uppercase;letter-spacing:.5px;margin-top:5px;">Target Schools</div>
-        </div>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:15px;margin-bottom:25px;">
         <div style="background:#e8f5e9;border:2px solid #28a745;border-radius:10px;padding:20px 10px;text-align:center;">
           <div style="font-size:36px;font-weight:700;color:#28a745;">${submitted.length}</div>
-          <div style="font-size:12px;color:#555;text-transform:uppercase;letter-spacing:.5px;margin-top:5px;">Submitted</div>
-        </div>
-        <div style="background:#fff5f5;border:2px solid #dc3545;border-radius:10px;padding:20px 10px;text-align:center;">
-          <div style="font-size:36px;font-weight:700;color:#dc3545;">${pending.length}</div>
-          <div style="font-size:12px;color:#555;text-transform:uppercase;letter-spacing:.5px;margin-top:5px;">Remaining</div>
+          <div style="font-size:12px;color:#555;text-transform:uppercase;letter-spacing:.5px;margin-top:5px;">Schools Submitted</div>
         </div>
         <div style="background:#fff8e1;border:2px solid #ffc107;border-radius:10px;padding:20px 10px;text-align:center;">
-          <div style="font-size:36px;font-weight:700;color:#e6a800;">${pct}%</div>
-          <div style="font-size:12px;color:#555;text-transform:uppercase;letter-spacing:.5px;margin-top:5px;">Completion</div>
+          <div style="font-size:36px;font-weight:700;color:#e6a800;">${Object.keys(byDist).length}</div>
+          <div style="font-size:12px;color:#555;text-transform:uppercase;letter-spacing:.5px;margin-top:5px;">Districts Covered</div>
         </div>
       </div>
-      <div style="background:#e9ecef;border-radius:8px;height:20px;overflow:hidden;margin:0 0 25px 0;">
-        <div style="background:${pct===100?'#28a745':'#004080'};height:100%;width:${pct}%;transition:width .4s;border-radius:8px;"></div>
-      </div>
       <div style="margin-bottom:25px;">
-        <div style="background:#004080;color:#fff;padding:12px 20px;border-radius:8px 8px 0 0;font-size:14px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;text-align:center;">Progress by District</div>
+        <div style="background:#004080;color:#fff;padding:12px 20px;border-radius:8px 8px 0 0;font-size:14px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;text-align:center;">Submissions by District</div>
         <div style="overflow-x:auto;border:2px solid #dee2e6;border-top:none;border-radius:0 0 8px 8px;">
           <table style="width:100%;border-collapse:collapse;font-size:13px;">
             <thead><tr style="background:#f8f9fa;">
               <th style="padding:12px 15px;text-align:left;border-bottom:1px solid #dee2e6;">District</th>
-              <th style="padding:12px;text-align:center;border-bottom:1px solid #dee2e6;">Target</th>
-              <th style="padding:12px;text-align:center;border-bottom:1px solid #dee2e6;">Done</th>
-              <th style="padding:12px;text-align:center;border-bottom:1px solid #dee2e6;">Left</th>
-              <th style="padding:12px 15px;text-align:center;border-bottom:1px solid #dee2e6;">Progress</th>
+              <th style="padding:12px;text-align:center;border-bottom:1px solid #dee2e6;">Submitted</th>
             </tr></thead>
             <tbody>${distRows}</tbody>
           </table>
@@ -821,8 +802,8 @@ window.openSummaryModal = function() {
       </div>
       <div>
         <div style="background:#004080;color:#fff;padding:12px 20px;border-radius:8px 8px 0 0;font-size:14px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;display:flex;justify-content:space-between;align-items:center;">
-          <span>All Assigned Schools</span>
-          <span style="font-size:12px;font-weight:400;opacity:.8;">Click any row to view / start</span>
+          <span>Submitted Schools</span>
+          <span style="font-size:12px;font-weight:400;opacity:.8;">Click any row to view details</span>
         </div>
         <div style="overflow-x:auto;border:2px solid #dee2e6;border-top:none;border-radius:0 0 8px 8px;">
           <table style="width:100%;border-collapse:collapse;font-size:13px;">
