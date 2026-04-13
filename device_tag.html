@@ -267,6 +267,8 @@ function parseQR(text) {
             if (key === 'role')     r.role     = val;
             if (key === 'district') r.district = val;
             if (key === 'tel')      r.tel      = val;
+            if (key === 'chiefdom') r.chiefdom = val;
+            if (key === 'facility') r.facility = val;
         });
         if (!r.code && r.tel) r.code = 'SBD-' + r.tel;
         return r;
